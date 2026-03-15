@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Segmentation Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .card-hover {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="gradient-bg text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <i class="fas fa-chart-pie text-2xl"></i>
+                <h1 class="text-2xl font-bold">Customer Segmentation</h1>
+            </div>
+            <p class="text-sm opacity-90">AI-Powered RFM & Clustering Analysis</p>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <div class="bg-gradient-to-br from-blue-50 to-indigo-50 py-16">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold text-gray-900 mb-4">
+                    <i class="fas fa-brain text-indigo-600"></i> Intelligent Customer Insights
+                </h2>
+                <p class="text-xl text-gray-700">Unlock customer behavior patterns with RFM analysis and machine learning</p>
+            </div>
+
+            <!-- Main Upload Card -->
+            <div class="bg-white rounded-2xl shadow-xl p-8 mb-12 card-hover">
+                <form action="/analyze" method="POST" enctype="multipart/form-data" id="uploadForm" class="space-y-6">
+                    
+                    <!-- File Upload Area -->
+                    <div class="border-2 border-dashed border-indigo-300 rounded-xl p-12 text-center hover:border-indigo-500 transition cursor-pointer" id="dropZone">
+                        <div class="mb-4">
+                            <i class="fas fa-cloud-upload-alt text-5xl text-indigo-500"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">Upload Your CSV File</h3>
+                        <p class="text-gray-600 mb-4">Drag and drop your customer data file or click to browse</p>
+                        <input type="file" name="file" accept=".csv" id="fileInput" class="hidden" required>
+                        <button type="button" onclick="document.getElementById('fileInput').click()" class="btn-primary text-white px-8 py-3 rounded-lg font-semibold inline-block">
+                            <i class="fas fa-folder-open mr-2"></i> Select File
+                        </button>
+                        <p id="fileName" class="mt-4 text-gray-600 text-sm"></p>
+                    </div>
+
+                    <!-- View Mode Selection -->
+                    <div class="bg-gray-50 p-6 rounded-xl">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                            <i class="fas fa-sliders-h text-indigo-600"></i> Analysis Mode
+                        </h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <label class="flex items-center p-4 border-2 border-indigo-300 rounded-lg cursor-pointer hover:bg-indigo-50 transition">
+                                <input type="radio" name="view_mode" value="basic" checked class="w-5 h-5 text-indigo-600">
+                                <div class="ml-3">
+                                    <span class="font-semibold text-gray-800">Basic View</span>
+                                    <p class="text-sm text-gray-600">Summary overview & key insights</p>
+                                </div>
+                            </label>
+                            <label class="flex items-center p-4 border-2 border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition">
+                                <input type="radio" name="view_mode" value="advanced" class="w-5 h-5 text-indigo-600">
+                                <div class="ml-3">
+                                    <span class="font-semibold text-gray-800">Advanced View</span>
+                                    <p class="text-sm text-gray-600">Detailed RFM & RFM analytics</p>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit" class="w-full btn-primary text-white py-4 rounded-lg font-bold text-lg hover:shadow-lg transition">
+                        <i class="fas fa-magic mr-2"></i> Start Analysis
+                    </button>
+                </form>
+            </div>
+
+            <!-- Features Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
+                <div class="bg-white rounded-xl p-6 shadow-md card-hover">
+                    <div class="text-3xl mb-3"><i class="fas fa-chart-line text-green-500"></i></div>
+                    <h3 class="font-bold text-gray-800 mb-2">RFM Analysis</h3>
+                    <p class="text-gray-600 text-sm">Recency, Frequency & Monetary metrics for deep customer understanding</p>
+                </div>
+                <div class="bg-white rounded-xl p-6 shadow-md card-hover">
+                    <div class="text-3xl mb-3"><i class="fas fa-microchip text-blue-500"></i></div>
+                    <h3 class="font-bold text-gray-800 mb-2">Smart Clustering</h3>
+                    <p class="text-gray-600 text-sm">Auto-optimized K using silhouette score for best segmentation</p>
+                </div>
+                <div class="bg-white rounded-xl p-6 shadow-md card-hover">
+                    <div class="text-3xl mb-3"><i class="fas fa-download text-purple-500"></i></div>
+                    <h3 class="font-bold text-gray-800 mb-2">Export Reports</h3>
+                    <p class="text-gray-600 text-sm">Download insights as PDF or CSV for presentations</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="gradient-bg text-white py-8 mt-12">
+        <div class="max-w-6xl mx-auto px-4 text-center">
+            <p class="mb-2">Advanced Customer Segmentation Platform</p>
+            <p class="text-sm opacity-75">Powered by RFM Analysis & K-Means Clustering</p>
+        </div>
+    </footer>
+
+    <script>
+        // File input handling
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const fileName = e.target.files[0]?.name || '';
+            document.getElementById('fileName').textContent = fileName ? `✓ Selected: ${fileName}` : '';
+        });
+
+        // Drag and drop
+        const dropZone = document.getElementById('dropZone');
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-indigo-500', 'bg-indigo-50');
+        });
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('border-indigo-500', 'bg-indigo-50');
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-indigo-500', 'bg-indigo-50');
+            if (e.dataTransfer.files.length) {
+                document.getElementById('fileInput').files = e.dataTransfer.files;
+                document.getElementById('fileName').textContent = `✓ Selected: ${e.dataTransfer.files[0].name}`;
+            }
+        });
+    </script>
+</body>
+</html>

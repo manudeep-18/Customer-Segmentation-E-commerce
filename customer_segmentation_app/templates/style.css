@@ -1,0 +1,111 @@
+/* ---------- Global ---------- */
+body {
+    margin: 0;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    background: linear-gradient(135deg, #f4f1ff, #fdfdf5);
+    color: #333;
+}
+
+/* ---------- Headings ---------- */
+h1 {
+    text-align: center;
+    color: #6a3cc9;
+    margin-top: 30px;
+}
+
+h2 {
+    color: #5a33b1;
+    margin-top: 30px;
+}
+
+/* ---------- Page Container ---------- */
+.container {
+    max-width: 1100px;
+    margin: auto;
+    padding: 20px;
+}
+
+/* ---------- Card Style ---------- */
+.card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+    padding: 25px;
+    margin-bottom: 30px;
+}
+
+/* ---------- Upload Section ---------- */
+.upload-box {
+    display: flex;
+    gap: 40px;
+    align-items: center;
+}
+
+.upload-left {
+    flex: 1;
+    background: #e9edff;
+    border-radius: 10px;
+    height: 230px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+    color: #7a7a7a;
+}
+
+.upload-right {
+    flex: 1;
+}
+
+input[type="file"] {
+    padding: 10px;
+    width: 100%;
+    margin-top: 10px;
+}
+
+/* ---------- Button ---------- */
+button {
+    margin-top: 20px;
+    width: 100%;
+    padding: 12px;
+    background: #5b4ce6;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #4a3ed6;
+}
+
+/* ---------- Charts ---------- */
+.chart-row {
+    display: flex;
+    gap: 40px;
+    flex-wrap: wrap;
+}
+
+.chart {
+    flex: 1;
+    text-align: center;
+}
+
+.chart img {
+    max-width: 100%;
+    border-radius: 10px;
+}
+
+/* ---------- Explanation ---------- */
+ul {
+    line-height: 1.8;
+}
+
+/* ---------- Footer ---------- */
+.footer {
+    text-align: center;
+    margin: 30px 0;
+    color: #777;
+    font-size: 14px;
+}

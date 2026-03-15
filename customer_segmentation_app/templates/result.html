@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Segmentation Results</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .tab-active {
+            border-bottom: 3px solid #667eea;
+            color: #667eea;
+        }
+        .segment-card {
+            border-left: 5px solid;
+            transition: all 0.3s ease;
+        }
+        .segment-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="gradient-bg text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <i class="fas fa-chart-pie text-2xl"></i>
+                <h1 class="text-2xl font-bold">Segmentation Results</h1>
+            </div>
+            <a href="/" class="px-4 py-2 bg-white text-indigo-600 rounded-lg font-semibold hover:bg-gray-100 transition">
+                <i class="fas fa-arrow-left mr-2"></i>New Analysis
+            </a>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div class="bg-white rounded-xl shadow p-6 border-l-4 border-indigo-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm">Total Customers</p>
+                        <p class="text-3xl font-bold text-gray-800">{{ total_customers }}</p>
+                    </div>
+                    <i class="fas fa-users text-4xl text-indigo-500 opacity-20"></i>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl shadow p-6 border-l-4 border-purple-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm">Segments Found</p>
+                        <p class="text-3xl font-bold text-gray-800">{{ optimal_k }}</p>
+                    </div>
+                    <i class="fas fa-chart-bar text-4xl text-purple-500 opacity-20"></i>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl shadow p-6 border-l-4 border-green-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm">Silhouette Score</p>
+                        <p class="text-3xl font-bold text-gray-800">{{ "%.3f"|format(silhouette_score) }}</p>
+                    </div>
+                    <i class="fas fa-star text-4xl text-green-500 opacity-20"></i>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl shadow p-6 border-l-4 border-orange-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm">Analysis Mode</p>
+                        <p class="text-3xl font-bold text-gray-800 capitalize">{{ view_mode }}</p>
+                    </div>
+                    <i class="fas fa-sliders-h text-4xl text-orange-500 opacity-20"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs Navigation -->
+        <div class="bg-white rounded-xl shadow mb-8 overflow-hidden">
+            <div class="flex border-b overflow-x-auto">
+                <button class="tab-btn tab-active px-6 py-4 font-semibold text-gray-700 whitespace-nowrap" onclick="switchTab('overview')">
+                    <i class="fas fa-eye mr-2"></i> Overview
+                </button>
+                <button class="tab-btn px-6 py-4 font-semibold text-gray-700 hover:text-indigo-600 whitespace-nowrap" onclick="switchTab('segments')">
+                    <i class="fas fa-th-list mr-2"></i> Segment Details
+                </button>
+                {% if view_mode == 'advanced' %}
+                <button class="tab-btn px-6 py-4 font-semibold text-gray-700 hover:text-indigo-600 whitespace-nowrap" onclick="switchTab('rfm')">
+                    <i class="fas fa-database mr-2"></i> RFM Analysis
+                </button>
+                {% endif %}
+                <button class="tab-btn px-6 py-4 font-semibold text-gray-700 hover:text-indigo-600 whitespace-nowrap" onclick="switchTab('recommendations')">
+                    <i class="fas fa-lightbulb mr-2"></i> Marketing Recommendations
+                </button>
+            </div>
+
+            <!-- Tab Contents -->
+            <div class="p-8">
+                <!-- Overview Tab -->
+                <div id="overview" class="tab-content">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6">
+                        <i class="fas fa-chart-pie text-indigo-600"></i> Segment Overview
+                    </h2>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div class="bg-gray-50 rounded-xl p-6">
+                            <h3 class="font-bold text-gray-800 mb-4">Distribution</h3>
+                            <img src="{{ url_for('static', filename='pie.png') }}" alt="Distribution" class="w-full rounded-lg shadow">
+                        </div>
+                        <div class="bg-gray-50 rounded-xl p-6">
+                            <h3 class="font-bold text-gray-800 mb-4">Cluster Visualization</h3>
+                            <img src="{{ url_for('static', filename='scatter.png') }}" alt="Scatter" class="w-full rounded-lg shadow">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Segments Tab -->
+                <div id="segments" class="tab-content hidden">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6">
+                        <i class="fas fa-th-list text-indigo-600"></i> Customer Segments
+                    </h2>
+                    <div class="space-y-6">
+                        {% for segment_name, profile in segment_summaries.items() %}
+                        <div class="segment-card bg-white rounded-xl shadow p-6" style="border-color: {{ profile.color }}">
+                            <div class="flex items-start justify-between mb-4">
+                                <div>
+                                    <h3 class="text-2xl font-bold text-gray-800">
+                                        <span style="color: {{ profile.color }}">{{ profile.icon }}</span> {{ segment_name }}
+                                    </h3>
+                                    <p class="text-gray-600 mt-2">{{ profile.count }} customers ({{ profile.percentage }}%)</p>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4">
+                                    <p class="text-xs text-gray-600 font-semibold mb-1">AVG AGE</p>
+                                    <p class="text-2xl font-bold text-blue-600">{{ profile.avg_age }}</p>
+                                </div>
+                                <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4">
+                                    <p class="text-xs text-gray-600 font-semibold mb-1">AVG INCOME</p>
+                                    <p class="text-2xl font-bold text-green-600">${{ "%.0f"|format(profile.avg_income) }}</p>
+                                </div>
+                                <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4">
+                                    <p class="text-xs text-gray-600 font-semibold mb-1">FREQUENCY</p>
+                                    <p class="text-2xl font-bold text-purple-600">{{ profile.avg_frequency }}</p>
+                                </div>
+                                <div class="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4">
+                                    <p class="text-xs text-gray-600 font-semibold mb-1">AVG SPEND</p>
+                                    <p class="text-2xl font-bold text-orange-600">${{ "%.0f"|format(profile.avg_monetary) }}</p>
+                                </div>
+                                <div class="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-4">
+                                    <p class="text-xs text-gray-600 font-semibold mb-1">RECENCY</p>
+                                    <p class="text-2xl font-bold text-red-600">{{ "%.0f"|format(profile.avg_recency) }}d</p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- RFM Analysis Tab (Advanced View) -->
+                {% if view_mode == 'advanced' %}
+                <div id="rfm" class="tab-content hidden">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6">
+                        <i class="fas fa-database text-indigo-600"></i> RFM Analysis
+                    </h2>
+                    <div class="bg-gray-50 rounded-xl p-6 mb-6">
+                        <h3 class="font-bold text-gray-800 mb-4">RFM Heatmap</h3>
+                        <img src="{{ url_for('static', filename='rfm_heatmap.png') }}" alt="RFM Heatmap" class="w-full rounded-lg shadow">
+                    </div>
+                    <div class="bg-white rounded-xl shadow overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="gradient-bg text-white">
+                                <tr>
+                                    <th class="px-6 py-3 text-left">Segment</th>
+                                    <th class="px-6 py-3 text-left">Avg Recency (days)</th>
+                                    <th class="px-6 py-3 text-left">Avg Frequency</th>
+                                    <th class="px-6 py-3 text-left">Avg Monetary ($)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for segment, metrics in rfm_summary.items() %}
+                                <tr class="border-b hover:bg-gray-50">
+                                    <td class="px-6 py-4 font-semibold">{{ segment }}</td>
+                                    <td class="px-6 py-4">{{ "%.1f"|format(metrics['Recency']) }}</td>
+                                    <td class="px-6 py-4">{{ "%.1f"|format(metrics['Frequency']) }}</td>
+                                    <td class="px-6 py-4">${{ "%.2f"|format(metrics['Monetary']) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Recommendations Tab -->
+                <div id="recommendations" class="tab-content hidden">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6">
+                        <i class="fas fa-lightbulb text-indigo-600"></i> Marketing Recommendations
+                    </h2>
+                    <div class="space-y-6">
+                        {% for segment, recs in marketing_recs.items() %}
+                        {% if segment_summaries[segment] %}
+                        <div class="bg-white rounded-xl shadow p-6 border-l-4" style="border-color: {{ segment_summaries[segment].color }}">
+                            <h3 class="text-xl font-bold text-gray-800 mb-4">
+                                <span style="color: {{ segment_summaries[segment].color }}">{{ segment_summaries[segment].icon }}</span> {{ segment }}
+                            </h3>
+                            <ul class="space-y-3">
+                                {% for rec in recs %}
+                                <li class="flex items-start">
+                                    <span class="text-lg mr-3">{{ rec.split()[0] }}</span>
+                                    <span class="text-gray-700">{{ rec[2:] }}</span>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Download Section -->
+        <div class="bg-white rounded-xl shadow p-8 mb-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">
+                <i class="fas fa-download text-indigo-600"></i> Export Results
+            </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <a href="{{ url_for('download_report', format='csv') }}" class="bg-green-500 hover:bg-green-600 text-white py-3 px-6 rounded-lg font-semibold transition inline-block text-center">
+                    <i class="fas fa-file-csv mr-2"></i> Download CSV Report
+                </a>
+                <a href="{{ url_for('download_report', format='pdf') }}" class="bg-red-500 hover:bg-red-600 text-white py-3 px-6 rounded-lg font-semibold transition inline-block text-center">
+                    <i class="fas fa-file-pdf mr-2"></i> Download PDF Report
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.add('hidden');
+            });
+            // Remove active class from all buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('tab-active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName).classList.remove('hidden');
+            
+            // Add active class to clicked button
+            event.target.closest('.tab-btn').classList.add('tab-active');
+        }
+
+        function downloadCSV() {
+            alert('CSV download feature coming soon!');
+        }
+
+        function downloadPDF() {
+            alert('PDF download feature coming soon!');
+        }
+    </script>
+</body>
+</html>
