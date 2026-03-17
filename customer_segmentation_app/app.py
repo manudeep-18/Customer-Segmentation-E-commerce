@@ -18,6 +18,7 @@ os.environ['MPLBACKEND'] = 'Agg'
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -108,6 +109,117 @@ def calculate_rfm(data):
     
     return data
 
+def convert_usd_to_inr(value):
+    try:
+        return float(value) * 83
+    except (TypeError, ValueError):
+        return 0
+
+def format_currency_inr(value, decimals=0):
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return "₹0"
+
+    negative = number < 0
+    number = abs(number)
+    fmt = f"{number:.{decimals}f}"
+    if "." in fmt:
+        integer_part, fractional_part = fmt.split(".")
+    else:
+        integer_part, fractional_part = fmt, ""
+
+    if len(integer_part) <= 3:
+        grouped = integer_part
+    else:
+        last3 = integer_part[-3:]
+        rest = integer_part[:-3]
+        parts = []
+        while len(rest) > 2:
+            parts.append(rest[-2:])
+            rest = rest[:-2]
+        if rest:
+            parts.append(rest)
+        grouped = ",".join(reversed(parts)) + "," + last3
+
+    if decimals and fractional_part:
+        grouped = f"{grouped}.{fractional_part}"
+
+    sign = "-" if negative else ""
+    return f"₹{sign}{grouped}"
+
+CHURN_RISK_LEVELS = ["High Risk", "Medium Risk", "Low Risk"]
+CHURN_ACTIONS = {
+    "High Risk": "Win-back campaign",
+    "Medium Risk": "Engagement email",
+    "Low Risk": "Loyalty rewards"
+}
+
+def get_churn_risk_level(probability):
+    if probability > 0.7:
+        return "High Risk"
+    if probability >= 0.4:
+        return "Medium Risk"
+    return "Low Risk"
+
+def build_churn_labels(data):
+    """Approximate churn labels from RFM heuristics to bootstrap the classifier"""
+    quantiles = data[["Recency", "Frequency", "Purchase_Intensity"]].quantile([0.25, 0.75])
+    recency_thresh = quantiles.loc[0.75, "Recency"]
+    frequency_thresh = quantiles.loc[0.25, "Frequency"]
+    intensity_thresh = quantiles.loc[0.25, "Purchase_Intensity"]
+
+    churn_flag = (
+        (data["Recency"] >= recency_thresh) &
+        (data["Frequency"] <= frequency_thresh) &
+        (data["Purchase_Intensity"] <= intensity_thresh)
+    ).astype(int)
+
+    if churn_flag.nunique() < 2:
+        pivot = len(churn_flag) // 2
+        churn_flag = pd.Series([1 if i < pivot else 0 for i in range(len(churn_flag))], index=data.index)
+    else:
+        churn_flag.index = data.index
+
+    return churn_flag
+
+def train_churn_model(data, feature_cols):
+    training_data = data[feature_cols].copy().fillna(0)
+    labels = build_churn_labels(data)
+    model = RandomForestClassifier(n_estimators=200, random_state=42)
+    model.fit(training_data, labels)
+    return model
+
+def apply_churn_predictions(data, model, feature_cols):
+    feature_values = data[feature_cols].copy().fillna(0)
+    probabilities = model.predict_proba(feature_values)[:, 1]
+    data["churn_probability"] = probabilities
+    data["churn_risk_level"] = data["churn_probability"].apply(get_churn_risk_level)
+    data["suggested_action"] = data["churn_risk_level"].map(CHURN_ACTIONS)
+    return data
+
+CLV_TIERS = ["High Value", "Medium Value", "Low Value"]
+
+def build_clv_baseline(data, lifespan_months=12):
+    safe_freq = data["Frequency"].replace(0, 1)
+    data["avg_purchase_value"] = data["Monetary"] / safe_freq
+    data["baseline_clv"] = data["avg_purchase_value"] * data["Frequency"] * lifespan_months
+    return data
+
+def train_clv_model(data, feature_cols, target):
+    training_data = data[feature_cols].copy().fillna(0)
+    model = RandomForestRegressor(n_estimators=150, random_state=42)
+    model.fit(training_data, target)
+    return model
+
+def classify_value_tier(value, percentiles):
+    p40, p75 = percentiles
+    if value > p75:
+        return "High Value"
+    if value >= p40:
+        return "Medium Value"
+    return "Low Value"
+
 def find_optimal_k(X_scaled, max_k=10):
     """Find optimal number of clusters using silhouette score"""
     silhouette_scores = []
@@ -123,6 +235,7 @@ def find_optimal_k(X_scaled, max_k=10):
     return optimal_k
 
 app = Flask(__name__)
+app.add_template_filter(format_currency_inr, 'format_currency_inr')
 
 @app.route("/")
 def index():
@@ -227,6 +340,20 @@ def analyze():
     data["Engagement_Score"] = data["Time Spent"] + data["Pages Viewed"]
     data["Purchase_Intensity"] = data["Frequency"] * data["Spending Score"]
     data["Customer_Value"] = data["Annual Income"] * data["Purchase_Intensity"]
+    data["Monetary_INR"] = data["Monetary"] * 83
+    churn_features = ["Recency", "Frequency", "Monetary", "Annual Income", "Engagement_Score", "Time on Site", "Purchase_Intensity"]
+    churn_model = train_churn_model(data, churn_features)
+    data = apply_churn_predictions(data, churn_model, churn_features)
+
+    clv_features = ["Frequency", "Monetary", "avg_purchase_value", "Recency", "Annual Income", "Engagement_Score"]
+    data = build_clv_baseline(data)
+    data["avg_purchase_value_inr"] = data["avg_purchase_value"] * 83
+    data["baseline_clv_inr"] = data["baseline_clv"] * 83
+    clv_model = train_clv_model(data, clv_features, data["baseline_clv"])
+    data["predicted_clv"] = clv_model.predict(data[clv_features].copy().fillna(0))
+    data["predicted_clv_inr"] = data["predicted_clv"].apply(convert_usd_to_inr)
+    clv_percentiles = np.nanpercentile(data["predicted_clv_inr"], [40, 75])
+    data["value_tier"] = data["predicted_clv_inr"].apply(lambda x: classify_value_tier(x, clv_percentiles))
 
     # Combine RFM with KMeans features
     X = data[["Recency", "Frequency", "Monetary", "Engagement_Score", "Purchase_Intensity", "Customer_Value"]]
@@ -269,11 +396,26 @@ def analyze():
     marketing_recs = get_marketing_recommendations(segment_summaries)
 
     # RFM summary
-    rfm_summary = data[["Cluster_Name", "Recency", "Frequency", "Monetary"]].groupby("Cluster_Name").agg({
+    rfm_summary = data[["Cluster_Name", "Recency", "Frequency", "Monetary_INR"]].groupby("Cluster_Name").agg({
         "Recency": "mean",
         "Frequency": "mean", 
-        "Monetary": "mean"
+        "Monetary_INR": "mean"
     }).round(2).to_dict('index')
+
+    churn_records = data[["Customer ID", "churn_probability", "churn_risk_level", "suggested_action"]].copy()
+    churn_records_sorted = churn_records.sort_values("churn_probability", ascending=False)
+    churn_display = churn_records_sorted.head(100).to_dict('records')
+    churn_distribution = data["churn_risk_level"].value_counts().reindex(CHURN_RISK_LEVELS, fill_value=0).to_dict()
+    churn_counts = [churn_distribution.get(level, 0) for level in CHURN_RISK_LEVELS]
+
+    total_predicted_value = data["predicted_clv_inr"].sum()
+    value_tier_counts = data["value_tier"].value_counts().reindex(CLV_TIERS, fill_value=0)
+    clv_hist_counts, clv_bin_edges = np.histogram(data["predicted_clv_inr"], bins=12)
+    clv_hist_labels = [
+        f"{clv_bin_edges[i]:.1f} - {clv_bin_edges[i+1]:.1f}"
+        for i in range(len(clv_bin_edges) - 1)
+    ]
+    clv_top10 = data.nlargest(10, "predicted_clv_inr")[["Customer ID", "predicted_clv_inr", "value_tier"]].to_dict('records')
 
     # Store latest analysis in app config for downloads
     try:
@@ -284,7 +426,11 @@ def analyze():
             'rfm_summary': rfm_summary,
             'optimal_k': optimal_k,
             'silhouette_score': float(silhouette_score(X_scaled, data["Cluster"].values)),
-            'cluster_map': cluster_map
+            'cluster_map': cluster_map,
+            'churn_summary': churn_distribution,
+            'churn_records': churn_records_sorted.head(25).to_dict('records'),
+            'clv_summary': value_tier_counts.to_dict(),
+            'clv_top10': clv_top10
         }
     except Exception:
         app.config.pop('LAST_ANALYSIS', None)
@@ -298,8 +444,17 @@ def analyze():
         marketing_recs=marketing_recs,
         rfm_summary=rfm_summary,
         data=data.to_dict('records'),
+        churn_data=churn_display,
+        churn_labels=CHURN_RISK_LEVELS,
+        churn_counts=churn_counts,
         total_customers=len(data),
-        silhouette_score=silhouette_score(X_scaled, data["Cluster"].values)
+        silhouette_score=silhouette_score(X_scaled, data["Cluster"].values),
+        total_predicted_value=total_predicted_value,
+        clv_hist_labels=clv_hist_labels,
+        clv_hist_counts=clv_hist_counts.tolist(),
+        clv_top10=clv_top10,
+        clv_value_tiers=[value_tier_counts.get(t, 0) for t in CLV_TIERS],
+        clv_tier_labels=CLV_TIERS
     )
 
 def calculate_segment_profiles(data, cluster_map):
@@ -310,13 +465,15 @@ def calculate_segment_profiles(data, cluster_map):
         segment_data = data[data["Cluster"] == cluster_id]
         cluster_name = cluster_map.get(cluster_id, {}).get("name", f"Cluster {cluster_id}")
         
+        avg_income_inr = segment_data["Annual Income"].mean() * 83
+        avg_monetary_inr = segment_data["Monetary_INR"].mean()
         profiles[cluster_name] = {
             "count": len(segment_data),
             "percentage": round((len(segment_data) / len(data) * 100), 1),
             "avg_age": round(segment_data["Age"].mean(), 1),
-            "avg_income": round(segment_data["Annual Income"].mean(), 0),
+            "avg_income": round(avg_income_inr, 0),
             "avg_frequency": round(segment_data["Frequency"].mean(), 1),
-            "avg_monetary": round(segment_data["Monetary"].mean(), 2),
+            "avg_monetary": round(avg_monetary_inr, 2),
             "avg_recency": round(segment_data["Recency"].mean(), 1),
             "avg_engagement": round(segment_data["Engagement_Score"].mean(), 1),
             "color": cluster_map.get(cluster_id, {}).get("color", "#999"),
@@ -488,6 +645,27 @@ def download_report(format):
                 for r in rec_list:
                     elements.append(Paragraph(f"• {r}", styles['Normal']))
                 elements.append(Spacer(1, 6))
+        churn_summary = analysis.get('churn_summary', {})
+        if churn_summary:
+            elements.append(Paragraph('Churn Risk Distribution', styles['Heading2']))
+            table_data = [["Risk Level", "Count", "Suggested Action"]]
+            for risk in CHURN_RISK_LEVELS:
+                table_data.append([
+                    risk,
+                    str(churn_summary.get(risk, 0)),
+                    CHURN_ACTIONS.get(risk, "")
+                ])
+
+            churn_table = Table(table_data, hAlign='LEFT')
+            churn_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1d4ed8')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('ALIGN', (1, 1), (-1, -1), 'CENTER')
+            ]))
+            elements.append(churn_table)
+            elements.append(Spacer(1, 12))
 
         # Include images if available
         static_dir = os.path.join(os.path.dirname(__file__), 'static')
